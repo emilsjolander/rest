@@ -70,7 +70,6 @@ type PrefixHandler struct {
 }
 
 func (this *PrefixHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer RecoverError(w)
 	this.Handler.SetPrefix(this.Prefix, r)
 	this.Handler.ServeHTTP(w, r)
 }
