@@ -41,23 +41,23 @@ func (v Value) Bool() bool {
 }
 
 type Values struct {
-	values url.Values
+	Values url.Values
 }
 
 func (v *Values) Require(key string) Value {
-	_, ok := v.values[key]
+	_, ok := v.Values[key]
 	if !ok {
 		panic(&HttpError{Status: 400, Message: "Missing argument: " + key})
 	}
-	return Value(v.values.Get(key))
+	return Value(v.Values.Get(key))
 }
 
 func (v *Values) Optional(key string, def string) Value {
-	_, ok := v.values[key]
+	_, ok := v.Values[key]
 	if !ok {
 		return Value(def)
 	}
-	return Value(v.values.Get(key))
+	return Value(v.Values.Get(key))
 }
 
 func Query(r *http.Request) *Values {
@@ -73,7 +73,7 @@ func Params(r *http.Request) *Values {
 	r.ParseForm()
 	values := &Values{r.Form}
 	for key, value := range r.URL.Query() {
-		values.values.Add(key, value[0])
+		values.Values.Add(key, value[0])
 	}
 	return values
 }

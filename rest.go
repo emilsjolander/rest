@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 )
 
 type matcher struct {
@@ -21,8 +22,13 @@ func matcherForPattern(pattern string) *matcher {
 	}
 
 	m = &matcher{
-		vars:    varMatcher.FindStringSubmatch(pattern),
-		pattern: regexp.MustCompile("^" + varMatcher.ReplaceAllString(pattern, "([A-Za-z0-9\\-_]+)") + "(/[A-Za-z0-9\\-_]*)*$"),
+		vars: varMatcher.FindStringSubmatch(pattern),
+		pattern: regexp.MustCompile(
+			fmt.Sprintf(
+				"^%s(/[A-Za-z0-9\\-_]*)*$",
+				varMatcher.ReplaceAllString(pattern, "([A-Za-z0-9\\-_]+)"),
+			),
+		),
 	}
 
 	matcherCache[pattern] = m
@@ -48,30 +54,16 @@ func RecoverError(w http.ResponseWriter) {
 		switch t := err.(type) {
 		case *HttpError:
 			ErrorHandler(w, t)
-		case error:
-			ErrorHandler(w, &HttpError{Status: http.StatusInternalServerError, Message: t.Error()})
-		case string:
-			ErrorHandler(w, &HttpError{Status: http.StatusInternalServerError, Message: t})
 		default:
 			ErrorHandler(w, &HttpError{Status: http.StatusInternalServerError, Message: "Internal server error"})
 		}
 	}
 }
 
-type Prefixable interface {
+type SubRouter interface {
 	http.Handler
-	SetPrefix(string, *http.Request)
-	GetPrefix(*http.Request) string
-}
-
-type PrefixHandler struct {
-	Prefix  string
-	Handler Prefixable
-}
-
-func (this *PrefixHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	this.Handler.SetPrefix(this.Prefix, r)
-	this.Handler.ServeHTTP(w, r)
+	SetProcessedPath(string, *http.Request)
+	ProcessedPath(*http.Request) string
 }
 
 type Routes map[string]http.Handler
@@ -79,12 +71,24 @@ type Routes map[string]http.Handler
 func (this *Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer RecoverError(w)
 
-	prefix := this.GetPrefix(r)
+	prefix := this.ProcessedPath(r)
 	path := r.URL.Path[len(prefix):]
+	if path == "" {
+		path = "/"
+	}
+
 	for key, value := range *this {
 		matcher := matcherForPattern(key)
 		if matches := matcher.pattern.FindStringSubmatch(path); matches != nil {
+
+			// gather the arguments if any for this key
+			matchString := key
 			for i, v := range matcher.vars {
+				if i == 0 {
+					// first match is the whole string. so we skip
+					continue
+				}
+				matchString = strings.Replace(matchString, "{"+v+"}", matches[i], -1)
 				switch r.URL.RawQuery {
 				case "":
 					r.URL.RawQuery = fmt.Sprintf("?%s=%s", v, matches[i])
@@ -92,23 +96,32 @@ func (this *Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					r.URL.RawQuery += fmt.Sprintf("&%s=%s", v, matches[i])
 				}
 			}
+
+			// set the processed part of the path if the mapped handler is a SubRouter
 			switch t := value.(type) {
-			case Prefixable:
-				t.SetPrefix(prefix+key, r)
+			case SubRouter:
+				t.SetProcessedPath(prefix+matchString, r)
+				value.ServeHTTP(w, r)
+				return
+			default:
+				// has to be exakt match, allowing trailing slash
+				if strings.HasSuffix(path, matchString) || (path[len(path)-1] == '/' && strings.HasSuffix(path[:len(path)-1], matchString)) {
+					value.ServeHTTP(w, r)
+					return
+				}
 			}
-			value.ServeHTTP(w, r)
-			return
 		}
 	}
+
 	ErrorHandler(w, &HttpError{Status: http.StatusNotFound, Message: "No matching handler for this route"})
 }
 
-func (this *Routes) SetPrefix(prefix string, r *http.Request) {
-	r.Header.Set("__REST_PREFIX_HEADER__", prefix)
+func (this *Routes) SetProcessedPath(prefix string, r *http.Request) {
+	r.Header.Set("X-REST_PROCESSED_PATH", prefix)
 }
 
-func (this *Routes) GetPrefix(r *http.Request) string {
-	return r.Header.Get("__REST_PREFIX_HEADER__")
+func (this *Routes) ProcessedPath(r *http.Request) string {
+	return r.Header.Get("X-REST_PROCESSED_PATH")
 }
 
 type Methods struct {
@@ -127,7 +140,7 @@ func (this *Methods) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer RecoverError(w)
 
 	var handler http.Handler
-	switch r.Method {
+	switch strings.ToUpper(r.Method) {
 	case "GET":
 		handler = this.Get
 	case "POST":
