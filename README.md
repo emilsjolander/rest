@@ -21,7 +21,7 @@ func main() {
 			"/": &rest.Methods{
 				Get: http.HandlerFunc(Hello),
 			},
-			"/{user_id}": &rest.Methods{
+			"/{name}": &rest.Methods{
 				Get: http.HandlerFunc(HelloThere),
 			},
 		},
