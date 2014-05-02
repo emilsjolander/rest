@@ -1,11 +1,10 @@
 rest
 ====
-A very plain and simple web request router for go. The goal was to make something that was both fun, easy, and flexible to use while respecting the great type system of the go language. Everything is built around the `http.Handler` interface which makes it very easy to write all kinds of middleware. One this that might not be very idomatic but i have found really cleans my code up is to report errors via panics. This allows me to right functions such as `RequireUser()` which will act like before filters in other libraries.
+A simple web request router for go. The goal with rest is to enable flexible request routing while respecting the great type system of the Go language. Everything is built around the `http.Handler` interface which makes your code both type safe and easy to integrate with other libraries. There is no use of the `interface{}` type in the library as keeping Go's static typing is one of the main goals. One thing that might not be very idomatic but i have found really cleans my code up is to report errors in handlers via panics. This allows you to write functions such as `RequireUser(*http.Request)` which will act like a before filters.
 
-example
+Example
 -------
 ```go
-
 import (
 	"fmt"
 	"net/http"
@@ -22,7 +21,7 @@ func main() {
 			"/": &rest.Methods{
 				Get: http.HandlerFunc(Hello),
 			},
-			"/{name}": &rest.Methods{
+			"/{user_id}": &rest.Methods{
 				Get: http.HandlerFunc(HelloThere),
 			},
 		},
@@ -41,7 +40,20 @@ func Hello(w http.ResponseWriter, r *http.Request) {
 }
 
 func HelloThere(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello "+r.URL.Query().Get("name"))
+	fmt.Fprintf(w, "Hello " + rest.Params(r).Require("name").String())
 }
-
 ```
+
+Api
+---
+###rest.Routes
+`rest.Routes` is a map type implementing the `http.Handler` interface. `rest.Routes` maps string (url patterns) to `http.Handler` types. because a `rest.Routes` is a `http.Handler` you can easily create sub-routes by using another `rest.Routes` as the `http.handler` being mapped to.
+
+###rest.Methods
+`rest.Methods` is a struct type with handler properties for every http method. Attach any `http.Handler` to the different methods to route a specific method to a specific handler. As with every other type `rest.Methods` also implements the `http.Handler` interface.
+
+###rest.SubRouter
+`rest.SubRouter` is an interface which defines a `http.Handler` that is not a leaf node in your request handler tree. To implement `rest.SubRouter` you must implement `http.Handler` as will as `SetProcessedPath(string, *http.Request)` and `ocessedPath(*http.Request) string`. `rest.Router` implements this interface.
+
+###rest.Values
+A `rest.Values` instance can be obtained through `rest.Params(*http.Request)`, `rest.Query(*http.Request)`, or `rest.Form(*http.Request)`. A `rest.Values` instance lets you make sure that certain values exist is the query string, the form values or any of them (`rest.Params(*http.Request)`).
