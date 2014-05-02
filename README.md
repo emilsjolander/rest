@@ -49,11 +49,46 @@ Api
 ###rest.Routes
 `rest.Routes` is a map type implementing the `http.Handler` interface. `rest.Routes` maps string (url patterns) to `http.Handler` types. because a `rest.Routes` is a `http.Handler` you can easily create sub-routes by using another `rest.Routes` as the `http.handler` being mapped to.
 
+```go
+type Routes map[string]http.Handler
+```
+
 ###rest.Methods
 `rest.Methods` is a struct type with handler properties for every http method. Attach any `http.Handler` to the different methods to route a specific method to a specific handler. As with every other type `rest.Methods` also implements the `http.Handler` interface.
+
+```go
+type Methods struct {
+	Get     http.Handler
+	Post    http.Handler
+	Put     http.Handler
+	Delete  http.Handler
+	Patch   http.Handler
+	Head    http.Handler
+	Options http.Handler
+	Connect http.Handler
+	Trace   http.Handler
+}
+```
 
 ###rest.SubRouter
 `rest.SubRouter` is an interface which defines a `http.Handler` that is not a leaf node in your request handler tree. To implement `rest.SubRouter` you must implement `http.Handler` as will as `SetProcessedPath(string, *http.Request)` and `ocessedPath(*http.Request) string`. `rest.Router` implements this interface.
 
+```go
+type SubRouter interface {
+	http.Handler
+	SetProcessedPath(string, *http.Request)
+	ProcessedPath(*http.Request) string
+}
+```
+
 ###rest.Values
-A `rest.Values` instance can be obtained through `rest.Params(*http.Request)`, `rest.Query(*http.Request)`, or `rest.Form(*http.Request)`. A `rest.Values` instance lets you make sure that certain values exist is the query string, the form values or any of them (`rest.Params(*http.Request)`).
+A `rest.Values` is a struct that wraps `url.Values` and can be obtained through `rest.Params(*http.Request)`, `rest.Query(*http.Request)`, or `rest.Form(*http.Request)`. A `rest.Values` instance lets you make sure that certain values exist is the query string, the form values or any of them (`rest.Params(*http.Request)`).
+
+```go
+func Query(r *http.Request) *Values
+func Form(r *http.Request) *Values
+func Params(r *http.Request) *Values
+
+func (v *Values) Require(key string) Value
+func (v *Values) Optional(key string, def string) Value
+```
