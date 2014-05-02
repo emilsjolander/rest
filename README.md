@@ -1,6 +1,6 @@
 rest
 ====
-A simple web request router for go. The goal with rest is to enable flexible request routing while respecting the great type system of the Go language. Everything is built around the `http.Handler` interface which makes your code both type safe and easy to integrate with other libraries. There is no use of the `interface{}` type in the library as keeping Go's static typing is one of the main goals. One thing that might not be very idomatic but i have found really cleans my code up is to report errors in handlers via panics. This allows you to write functions such as `RequireUser(*http.Request) *User` which will act like a before filters in some other libraries.
+A simple web request router for the Go programming language. The goal with rest is to enable flexible request routing while respecting the great type system of the Go language. Everything is built around the `http.Handler` interface which makes your code both type safe and easy to integrate with other libraries. There is no use of the `interface{}` type in the library as keeping Go's static typing is one of the main goals. One thing that might not be very idomatic but i have found really cleans my code up is to report errors in handlers via panics. This allows you to write functions such as `RequireUser(*http.Request) *User` which will act like a before filters in some other libraries.
 
 Example
 -------
