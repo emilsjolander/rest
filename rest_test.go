@@ -19,7 +19,7 @@ func TestRoute(t *testing.T) {
 					matched = "/hi"
 				}),
 			},
-			"/there": &Methods{
+			"/there/{first_name}/{last_name}": &Methods{
 				Get: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					matched = "/hi/there"
 				}),
@@ -45,7 +45,7 @@ func TestRoute(t *testing.T) {
 		t.Error("/hi route did not match, matched = " + matched)
 	}
 
-	r, _ = http.NewRequest("GET", "htttp://www.test.com/hi/there", nil)
+	r, _ = http.NewRequest("GET", "htttp://www.test.com/hi/there/bob/bobster", nil)
 	routes.ServeHTTP(nil, r)
 	if matched != "/hi/there" {
 		t.Error("/hi/there route did not match, matched = " + matched)

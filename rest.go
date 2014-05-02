@@ -21,8 +21,14 @@ func matcherForPattern(pattern string) *matcher {
 		return m
 	}
 
+	allSubmatches := varMatcher.FindAllStringSubmatch(pattern, -1)
+	vars := make([]string, len(allSubmatches))
+	for i, submatch := range allSubmatches {
+		vars[i] = submatch[1]
+	}
+
 	m = &matcher{
-		vars: varMatcher.FindStringSubmatch(pattern),
+		vars: vars,
 		pattern: regexp.MustCompile(
 			fmt.Sprintf(
 				"^%s(/[A-Za-z0-9\\-_]*)*$",
@@ -80,20 +86,16 @@ func (this *Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for key, value := range *this {
 		matcher := matcherForPattern(key)
 		if matches := matcher.pattern.FindStringSubmatch(path); matches != nil {
-
 			// gather the arguments if any for this key
 			matchString := key
 			for i, v := range matcher.vars {
-				if i == 0 {
-					// first match is the whole string. so we skip
-					continue
-				}
-				matchString = strings.Replace(matchString, "{"+v+"}", matches[i], -1)
+				match := matches[i+1] // skip first match as is is whole string
+				matchString = strings.Replace(matchString, "{"+v+"}", match, -1)
 				switch r.URL.RawQuery {
 				case "":
-					r.URL.RawQuery = fmt.Sprintf("?%s=%s", v, matches[i])
+					r.URL.RawQuery = fmt.Sprintf("%s=%s", v, match)
 				default:
-					r.URL.RawQuery += fmt.Sprintf("&%s=%s", v, matches[i])
+					r.URL.RawQuery += fmt.Sprintf("&%s=%s", v, match)
 				}
 			}
 
