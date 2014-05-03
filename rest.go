@@ -42,26 +42,42 @@ func matcherForPattern(pattern string) *matcher {
 }
 
 type HttpError struct {
-	Status  int
-	Message string
+	Status          int
+	Message         string
+	InternalMessage string
 }
 
 func (this *HttpError) Error() string {
 	return fmt.Sprintf("%d: %s", this.Status, this.Message)
 }
 
-var ErrorHandler = func(w http.ResponseWriter, err *HttpError) {
+var ErrorHandler = func(w http.ResponseWriter, r *http.Request, err *HttpError) {
 	w.WriteHeader(err.Status)
 	fmt.Fprintf(w, "%v", err)
 }
 
-func RecoverError(w http.ResponseWriter) {
+func RecoverError(w http.ResponseWriter, r *http.Request) {
 	if err := recover(); err != nil {
 		switch t := err.(type) {
 		case *HttpError:
-			ErrorHandler(w, t)
+			ErrorHandler(w, r, t)
+		case error:
+			ErrorHandler(w, r, &HttpError{
+				Status:          http.StatusInternalServerError,
+				Message:         "Internal server error",
+				InternalMessage: t.Error(),
+			})
+		case string:
+			ErrorHandler(w, r, &HttpError{
+				Status:          http.StatusInternalServerError,
+				Message:         "Internal server error",
+				InternalMessage: t,
+			})
 		default:
-			ErrorHandler(w, &HttpError{Status: http.StatusInternalServerError, Message: "Internal server error"})
+			ErrorHandler(w, r, &HttpError{
+				Status:  http.StatusInternalServerError,
+				Message: "Internal server error",
+			})
 		}
 	}
 }
@@ -75,7 +91,7 @@ type SubRouter interface {
 type Routes map[string]http.Handler
 
 func (this *Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer RecoverError(w)
+	defer RecoverError(w, r)
 
 	prefix := this.ProcessedPath(r)
 	path := r.URL.Path[len(prefix):]
@@ -115,7 +131,7 @@ func (this *Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ErrorHandler(w, &HttpError{Status: http.StatusNotFound, Message: "No matching handler for this route"})
+	ErrorHandler(w, r, &HttpError{Status: http.StatusNotFound, Message: "No matching handler for this route"})
 }
 
 func (this *Routes) SetProcessedPath(prefix string, r *http.Request) {
@@ -139,7 +155,7 @@ type Methods struct {
 }
 
 func (this *Methods) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer RecoverError(w)
+	defer RecoverError(w, r)
 
 	var handler http.Handler
 	switch strings.ToUpper(r.Method) {
@@ -163,7 +179,7 @@ func (this *Methods) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		handler = this.Trace
 	}
 	if handler == nil {
-		ErrorHandler(w, &HttpError{Status: http.StatusNotFound, Message: "No matching handler for this route"})
+		ErrorHandler(w, r, &HttpError{Status: http.StatusNotFound, Message: "No matching handler for this route"})
 		return
 	}
 	handler.ServeHTTP(w, r)
